@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pointage — Suivi des employés</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#FAF7F2;
+    --panel:#FFFFFF;
+    --ink:#22262B;
+    --ink-soft:#63696F;
+    --line:#E1DACB;
+    --line-strong:#C9C0AC;
+    --teal:#2F6F62;
+    --teal-deep:#204E44;
+    --amber:#C97B2E;
+    --rose:#B65454;
+    --slate:#8B93A1;
+    --weekend-bg:#F0ECE1;
+    --holiday-bg:#F6E4D8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.font-display{ font-family:'Space Grotesk',sans-serif; font-weight:600; margin:0; }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  button{ font-family:inherit; }
+  .wrap{ max-width:1360px; margin:0 auto; padding:26px 28px 70px; }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:2px solid var(--ink); padding-bottom:18px; margin-bottom:26px;
+    flex-wrap:wrap; gap:16px;
+  }
+  .brand{ display:flex; align-items:baseline; gap:12px; }
+  .brand h1{ font-size:22px; letter-spacing:-0.01em; }
+  .brand .tag{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft); }
+
+  .month-nav{ display:flex; align-items:center; gap:14px; }
+  .month-nav button{
+    width:34px; height:34px; border-radius:6px; border:1px solid var(--line-strong);
+    background:var(--panel); cursor:pointer; font-size:15px; color:var(--ink);
+    display:flex; align-items:center; justify-content:center; transition:background .15s;
+  }
+  .month-nav button:hover{ background:var(--weekend-bg); }
+  .month-label{ font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; min-width:150px; text-align:center; text-transform:capitalize; }
+
+  .layout{ display:grid; grid-template-columns:290px 1fr; gap:24px; align-items:start; }
+  @media (max-width:1040px){ .layout{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 18px 20px;
+  }
+  .panel + .panel{ margin-top:18px; }
+  .panel h2{ font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:14px; }
+
+  .list-row{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:8px;
+    padding:10px 0; border-bottom:1px solid var(--line);
+  }
+  .list-row:last-of-type{ border-bottom:none; }
+  .list-row .name{ font-weight:600; font-size:14px; }
+  .list-row .sub{ font-size:11.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; line-height:1.6; }
+  .row-actions button{
+    background:none; border:none; cursor:pointer; color:var(--ink-soft); font-size:13px;
+    padding:4px 6px; border-radius:4px; flex-shrink:0;
+  }
+  .row-actions button:hover{ background:var(--weekend-bg); color:var(--rose); }
+
+  .status-chip-mini{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; }
+  .dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .kind-tag{
+    font-size:10px; text-transform:uppercase; letter-spacing:.03em; padding:1px 6px;
+    border-radius:4px; background:var(--weekend-bg); color:var(--ink-soft); font-weight:700;
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:9px 14px; border-radius:7px; font-size:13.5px; font-weight:600;
+    cursor:pointer; border:1px solid transparent; transition:opacity .15s, transform .1s;
+  }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--ink); color:#fff; }
+  .btn-primary:hover{ opacity:.85; }
+  .btn-ghost{ background:transparent; border-color:var(--line-strong); color:var(--ink); }
+  .btn-ghost:hover{ background:var(--weekend-bg); }
+  .btn-full{ width:100%; margin-top:10px; }
+
+  .calendar-wrap{ background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .calendar-scroll{ overflow-x:auto; }
+  table.calendar{ border-collapse:collapse; width:100%; min-width:640px; }
+  table.calendar th, table.calendar td{
+    border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:0; text-align:center;
+  }
+  table.calendar th{
+    background:var(--ink); color:#fff; font-size:12px; font-weight:600;
+    padding:10px 6px; white-space:nowrap;
+  }
+  table.calendar td.date-cell{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-soft);
+    text-align:left; padding:8px 10px; white-space:nowrap; background:var(--panel);
+    position:sticky; left:0;
+  }
+  table.calendar tr.holiday td.date-cell{ background:var(--holiday-bg); color:var(--amber); font-weight:600; }
+  table.calendar td.day-cell{ cursor:pointer; min-width:92px; height:48px; transition:background .12s; }
+  table.calendar td.day-cell.rest-cell{ background:var(--weekend-bg); }
+  table.calendar td.day-cell:hover{ background:#EFE7D6; }
+  .holiday-tag{ font-size:9.5px; color:var(--amber); display:block; margin-top:1px; }
+  .cell-chip{
+    display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+    padding:4px 8px; border-radius:5px; color:#fff; max-width:100%;
+  }
+  .ot-badge, .x2-badge{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--ink-soft); display:block; margin-top:2px; }
+  .x2-badge{ color:var(--rose); font-weight:700; }
+  .empty-state{ padding:60px 20px; text-align:center; color:var(--ink-soft); font-size:14px; }
+
+  .summary{ margin-top:26px; }
+  .summary h2{ font-size:16px; margin-bottom:14px; }
+  .summary-scroll{ overflow-x:auto; }
+  table.summary-table{ border-collapse:collapse; width:100%; min-width:800px; background:var(--panel); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  table.summary-table th, table.summary-table td{ padding:11px 14px; border-bottom:1px solid var(--line); font-size:13px; text-align:left; white-space:nowrap; }
+  table.summary-table th{ background:var(--weekend-bg); font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); }
+  table.summary-table td.num, table.summary-table th.num{ text-align:right; font-family:'IBM Plex Mono',monospace; }
+  table.summary-table tr:last-child td{ border-bottom:none; }
+  table.summary-table td.total{ font-weight:700; color:var(--teal-deep); }
+
+  .mini-form{ display:flex; flex-direction:column; gap:8px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line-strong); }
+  .mini-form input[type="text"], .mini-form input[type="number"], .mini-form input[type="time"], .mini-form select{
+    border:1px solid var(--line-strong); border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit;
+    background:var(--paper); color:var(--ink); width:100%;
+  }
+  .mini-form input[type="color"]{ width:40px; height:32px; border:1px solid var(--line-strong); border-radius:6px; padding:2px; background:var(--paper); cursor:pointer; }
+  .mini-form label{ font-size:11.5px; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:2px; }
+  .field-row{ display:flex; gap:8px; align-items:end; }
+  .field-row > div{ flex:1; }
+  .checkbox-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; }
+  .days-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .day-check{ display:flex; align-items:center; gap:5px; font-size:11.5px; background:var(--paper); border:1px solid var(--line-strong); border-radius:6px; padding:5px 7px; }
+  .hint{ font-size:11px; color:var(--ink-soft); margin-top:-2px; }
+
+  .modal-overlay{ position:fixed; inset:0; background:rgba(34,38,43,.5); display:none; align-items:center; justify-content:center; z-index:200; padding:20px; }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--panel); border-radius:12px; width:100%; max-width:420px; max-height:90vh; overflow-y:auto; padding:26px 26px 22px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35); }
+  .modal-box h3{ font-size:17px; margin-bottom:2px; }
+  .modal-sub{ font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; margin-bottom:6px; }
+  .modal-flag{ font-size:12px; color:var(--amber); font-weight:600; margin-bottom:14px; }
+  .modal-field{ margin-bottom:14px; }
+  .modal-field label{ font-size:12px; font-weight:600; color:var(--ink-soft); display:block; margin-bottom:5px; }
+  .modal-field select, .modal-field input{
+    width:100%; border:1px solid var(--line-strong); border-radius:7px; padding:9px 10px;
+    font-size:14px; font-family:inherit; background:var(--paper); color:var(--ink);
+  }
+  .modal-actions{ display:flex; gap:8px; margin-top:18px; }
+  .modal-actions .btn{ flex:1; }
+  .status-picker{ display:flex; flex-wrap:wrap; gap:8px; }
+  .status-option{ display:flex; align-items:center; gap:6px; padding:7px 11px; border-radius:7px; border:1.5px solid var(--line-strong); font-size:12.5px; font-weight:600; cursor:pointer; background:var(--paper); }
+  .status-option.selected{ border-color:var(--ink); background:var(--weekend-bg); }
+
+  .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:13.5px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:300; }
+  .toast.show{ opacity:1; }
+
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-soft); margin:10px 0 0; }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend .sw{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  ::-webkit-scrollbar{ height:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>Pointage</h1>
+      <span class="tag">suivi &amp; paie des employés</span>
+    </div>
+    <div class="month-nav">
+      <button id="prevMonth" aria-label="Mois précédent">‹</button>
+      <span class="month-label mono" id="monthLabel">—</span>
+      <button id="nextMonth" aria-label="Mois suivant">›</button>
+      <button class="btn btn-primary" id="exportExcel" style="width:auto; margin-left:10px;">⬇ Exporter en Excel</button>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <div>
+      <div class="panel">
+        <h2>Employés</h2>
+        <div id="employeeList"></div>
+        <button class="btn btn-ghost btn-full" id="toggleEmpForm">+ Ajouter un employé</button>
+        <div class="mini-form" id="empForm" style="display:none;">
+          <div>
+            <label>Nom</label>
+            <input type="text" id="empName" placeholder="Nom de l'employé">
+          </div>
+          <div class="field-row">
+            <div>
+              <label>Taux / jour (€)</label>
+              <input type="number" id="empRate" placeholder="100" min="0" step="1">
+            </div>
+            <div>
+              <label>Taux h. sup (€/h)</label>
+              <input type="number" id="empOt" placeholder="15" min="0" step="1">
+            </div>
+          </div>
+          <div class="field-row">
+            <div>
+              <label>Heure de début</label>
+              <input type="time" id="empStart" value="08:00">
+            </div>
+            <div>
+              <label>Heures prévues/jour</label>
+              <input type="number" id="empHours" placeholder="8" min="0" step="0.5" value="8">
+            </div>
+            <div>
+              <label>Pause (h)</label>
+              <input type="number" id="empBreak" placeholder="1" min="0" step="0.25" value="1">
+            </div>
+          </div>
+          <div>
+            <label>Jours de repos (2 recommandés)</label>
+            <div class="days-grid" id="empRestDays">
+              <label class="day-check"><input type="checkbox" value="1"> Lun</label>
+              <label class="day-check"><input type="checkbox" value="2"> Mar</label>
+              <label class="day-check"><input type="checkbox" value="3"> Mer</label>
+              <label class="day-check"><input type="checkbox" value="4"> Jeu</label>
+              <label class="day-check"><input type="checkbox" value="5"> Ven</label>
+              <label class="day-check"><input type="checkbox" value="6" checked> Sam</label>
+              <label class="day-check"><input type="checkbox" value="0" checked> Dim</label>
+            </div>
+            <p class="hint">Si l'employé travaille un de ces jours, la journée sera payée ×2 automatiquement.</p>
+          </div>
+          <div>
+            <label>Fonction</label>
+            <input type="text" id="empRole" list="roleOptions" placeholder="Ex : Commercial Lignes">
+            <datalist id="roleOptions">
+              <option value="Commercial Lignes">
+              <option value="Relance">
+              <option value="Administrative">
+              <option value="Gestion Tech">
+              <option value="Prospection Freelance">
+              <option value="RH Freelance">
+              <option value="Gestion Techniciens">
+              <option value="Recouvrement">
+              <option value="Polyvalente">
+            </datalist>
+          </div>
+          <div>
+            <label>Mode de paiement</label>
+            <select id="empPaymentMode">
+              <option value="jour">Par jour (taux journalier)</option>
+              <option value="heure">Par heure travaillée</option>
+              <option value="commission">Par commission (freelance)</option>
+            </select>
+          </div>
+          <div id="empHourlyRateField" style="display:none;">
+            <label>Taux horaire (€/h)</label>
+            <input type="number" id="empHourlyRate" placeholder="12" min="0" step="0.5">
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="empTrial">
+            <label for="empTrial" style="margin:0;">En période d'essai</label>
+          </div>
+          <button class="btn btn-primary btn-full" id="saveEmp">Ajouter</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Statuts de pointage</h2>
+        <div id="statusList"></div>
+        <button class="btn btn-ghost btn-full" id="toggleStatusForm">+ Ajouter un statut</button>
+        <div class="mini-form" id="statusForm" style="display:none;">
+          <div class="field-row">
+            <div>
+              <label>Libellé</label>
+              <input type="text" id="statusLabel" placeholder="Ex : Férié travaillé">
+            </div>
+            <div style="flex:none;">
+              <label>Couleur</label>
+              <input type="color" id="statusColor" value="#2F6F62">
+            </div>
+          </div>
+          <div>
+            <label>Catégorie</label>
+            <select id="statusKind">
+              <option value="normal">Normal (jour travaillé standard)</option>
+              <option value="permanence">Permanence</option>
+              <option value="absence">Absence</option>
+            </select>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="statusPaid" checked>
+            <label for="statusPaid" style="margin:0;">Compte comme jour payé (taux journalier)</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="statusWorked" checked>
+            <label for="statusWorked" style="margin:0;">Compte dans les heures travaillées</label>
+          </div>
+          <div>
+            <label>Prime fixe associée (€, optionnel)</label>
+            <input type="number" id="statusBonus" placeholder="0" min="0" step="1">
+          </div>
+          <button class="btn btn-primary btn-full" id="saveStatus">Ajouter le statut</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="calendar-wrap">
+        <div class="calendar-scroll">
+          <table class="calendar" id="calendarTable"></table>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--weekend-bg);"></span> Jour de repos de l'employé</span>
+        <span><span class="sw" style="background:var(--holiday-bg);"></span> Jour férié (France)</span>
+      </div>
+
+      <div class="summary">
+        <h2>Estimation du mois</h2>
+        <div class="summary-scroll">
+          <table class="summary-table" id="summaryTable"></table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-overlay" id="dayModal">
+  <div class="modal-box">
+    <h3 id="modalEmpName">—</h3>
+    <p class="modal-sub" id="modalDate">—</p>
+    <p class="modal-flag" id="modalFlag" style="display:none;"></p>
+
+    <div class="modal-field">
+      <label>Statut</label>
+      <div class="status-picker" id="statusPicker"></div>
+    </div>
+
+    <div class="modal-field" id="retardField">
+      <label>Retard</label>
+      <div class="checkbox-row" style="margin-bottom:6px;">
+        <input type="checkbox" id="modalRetardCheck">
+        <label for="modalRetardCheck" style="margin:0;">L'employé est arrivé en retard</label>
+      </div>
+      <input type="number" id="modalRetardMin" min="0" step="5" placeholder="Minutes de retard" style="display:none;">
+    </div>
+
+    <div class="modal-field" id="absenceField" style="display:none;">
+      <label>Motif d'absence</label>
+      <input type="text" id="modalAbsenceReason" placeholder="Ex : maladie, sans nouvelles, rdv personnel...">
+    </div>
+
+    <div class="modal-field" id="commissionField" style="display:none;">
+      <label>Commission du jour</label>
+      <select id="modalCommission">
+        <option value="0">0 €</option>
+        <option value="20">20 €</option>
+        <option value="40">40 €</option>
+      </select>
+    </div>
+
+    <div class="modal-field">
+      <label>Heures supplémentaires</label>
+      <input type="number" id="modalOt" min="0" step="0.5" placeholder="0">
+    </div>
+
+    <div class="modal-field">
+      <label>Note (optionnel)</label>
+      <input type="text" id="modalNote" placeholder="Ex : rendez-vous client">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="clearDay">Effacer</button>
+      <button class="btn btn-primary" id="saveDay">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   ÉTAT & PERSISTANCE
+   ============================================================ */
+let employees = [];
+let statusTypes = [];
+let records = {};
+let currentMonth = new Date();
+currentMonth.setDate(1);
+let editingCell = null;
+
+const MOIS_FR = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+const JOURS_FR = ["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
+
+function uid(prefix){ return prefix + Math.random().toString(36).slice(2,9); }
+function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+function dateKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 1900);
+}
+
+async function saveMeta(){
+  try{ localStorage.setItem('pointage-app-meta', JSON.stringify({employees, statusTypes})); }
+  catch(e){ console.error(e); showToast("Erreur d'enregistrement"); }
+}
+async function loadMeta(){
+  try{ const raw = localStorage.getItem('pointage-app-meta'); if(raw) return JSON.parse(raw); }
+  catch(e){}
+  return null;
+}
+async function saveRecords(){
+  try{ localStorage.setItem('pointage-records-'+monthKey(currentMonth), JSON.stringify(records)); }
+  catch(e){ console.error(e); showToast("Erreur d'enregistrement"); }
+}
+async function loadRecords(){
+  try{ const raw = localStorage.getItem('pointage-records-'+monthKey(currentMonth)); if(raw) return JSON.parse(raw); }
+  catch(e){}
+  return {};
+}
+
+/* ============================================================
+   JOURS FÉRIÉS FRANÇAIS (calcul automatique, incl. Pâques)
+   ============================================================ */
+function easterDate(year){
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b%4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15)%30;
+  const i = Math.floor(c/4), k = c%4, l = (32+2*e+2*i-h-k)%7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const month = Math.floor((h+l-7*m+114)/31);
+  const day = ((h+l-7*m+114)%31)+1;
+  return new Date(year, month-1, day);
+}
+function addDays(d,n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function frenchHolidaysMap(year){
+  const easter = easterDate(year);
+  const list = [
+    {date:new Date(year,0,1),  label:"Jour de l'An"},
+    {date:new Date(year,4,1),  label:"Fête du Travail"},
+    {date:new Date(year,4,8),  label:"Victoire 1945"},
+    {date:new Date(year,6,14), label:"Fête Nationale"},
+    {date:new Date(year,7,15), label:"Assomption"},
+    {date:new Date(year,10,1), label:"Toussaint"},
+    {date:new Date(year,10,11),label:"Armistice"},
+    {date:new Date(year,11,25),label:"Noël"},
+    {date:addDays(easter,1),   label:"Lundi de Pâques"},
+    {date:addDays(easter,39),  label:"Ascension"},
+    {date:addDays(easter,50),  label:"Lundi de Pentecôte"},
+  ];
+  const map = {};
+  list.forEach(h => map[dateKey(h.date)] = h.label);
+  return map;
+}
+
+/* ============================================================
+   DONNÉES PAR DÉFAUT
+   ============================================================ */
+function seedDefaults(){
+  employees = [
+    { id: uid('emp_'), name:'Exemple Employé', dailyRate:100, otRate:15, startTime:'08:00', scheduledHours:8, breakHours:1, restDays:[0,6], role:'Polyvalente', paymentMode:'jour', hourlyRate:0, trial:false }
+  ];
+  statusTypes = [
+    { id: uid('st_'), label:'Présent',    color:'#2F6F62', kind:'normal',     paid:true,  worked:true,  bonus:0 },
+    { id: uid('st_'), label:'Absent',     color:'#B65454', kind:'absence',    paid:false, worked:false, bonus:0 },
+    { id: uid('st_'), label:'Congé',      color:'#8B93A1', kind:'normal',     paid:true,  worked:false, bonus:0 },
+    { id: uid('st_'), label:'Permanence', color:'#C97B2E', kind:'permanence', paid:true,  worked:true,  bonus:20 },
+  ];
+}
+
+async function init(){
+  const meta = await loadMeta();
+  if(meta && meta.employees && meta.statusTypes && meta.employees.length){
+    employees = meta.employees;
+    statusTypes = meta.statusTypes;
+  } else {
+    seedDefaults();
+    await saveMeta();
+  }
+  records = await loadRecords();
+  renderAll();
+}
+
+/* ============================================================
+   RENDU
+   ============================================================ */
+function renderAll(){
+  renderMonthLabel();
+  renderEmployeeList();
+  renderStatusList();
+  renderCalendar();
+  renderSummary();
+}
+function renderMonthLabel(){
+  document.getElementById('monthLabel').textContent = MOIS_FR[currentMonth.getMonth()] + " " + currentMonth.getFullYear();
+}
+
+const DAY_ABBR = {0:'Dim',1:'Lun',2:'Mar',3:'Mer',4:'Jeu',5:'Ven',6:'Sam'};
+
+const PAYMENT_LABEL = {jour:'par jour', heure:'par heure', commission:'par commission'};
+
+function renderEmployeeList(){
+  const el = document.getElementById('employeeList');
+  if(!employees.length){ el.innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Aucun employé pour l\'instant.</p>'; return; }
+  el.innerHTML = employees.map(e => `
+    <div class="list-row">
+      <div>
+        <div class="name">${escapeHtml(e.name)} ${e.trial ? '<span class="kind-tag" style="color:var(--amber);">Essai</span>' : ''}</div>
+        <div class="sub">
+          ${escapeHtml(e.role || 'Fonction non renseignée')}<br>
+          Payé ${PAYMENT_LABEL[e.paymentMode]||'par jour'} ${e.paymentMode==='heure' ? '('+(e.hourlyRate||0)+'€/h)' : e.paymentMode==='jour' ? '('+e.dailyRate+'€/j)' : ''} · ${e.otRate}€/h sup<br>
+          Début ${e.startTime||'—'} · ${e.scheduledHours||8}h prévues · ${e.breakHours||0}h pause<br>
+          Repos : ${(e.restDays||[]).map(d=>DAY_ABBR[d]).join(', ') || '—'}
+        </div>
+      </div>
+      <div class="row-actions">
+        <button data-remove-emp="${e.id}" title="Supprimer">✕</button>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('[data-remove-emp]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm("Supprimer cet employé ? (l'historique de pointage associé restera stocké mais ne sera plus affiché)")) return;
+      employees = employees.filter(e => e.id !== btn.dataset.removeEmp);
+      await saveMeta();
+      renderAll();
+    });
+  });
+}
+
+const KIND_LABEL = {normal:'Normal', permanence:'Permanence', absence:'Absence'};
+
+function renderStatusList(){
+  const el = document.getElementById('statusList');
+  if(!statusTypes.length){ el.innerHTML = '<p style="font-size:13px;color:var(--ink-soft);">Aucun statut défini.</p>'; return; }
+  el.innerHTML = statusTypes.map(s => `
+    <div class="list-row">
+      <div>
+        <div class="status-chip-mini">
+          <span class="dot" style="background:${s.color}"></span>
+          ${escapeHtml(s.label)} <span class="kind-tag">${KIND_LABEL[s.kind]||'Normal'}</span>
+        </div>
+        <div class="sub">${s.paid?'payé':'non payé'}${s.worked?' · heures comptées':''}${s.bonus?' · +'+s.bonus+'€':''}</div>
+      </div>
+      <div class="row-actions">
+        <button data-remove-status="${s.id}" title="Supprimer">✕</button>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('[data-remove-status]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm("Supprimer ce statut ?")) return;
+      statusTypes = statusTypes.filter(s => s.id !== btn.dataset.removeStatus);
+      await saveMeta();
+      renderAll();
+    });
+  });
+}
+
+function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+
+function renderCalendar(){
+  const table = document.getElementById('calendarTable');
+  if(!employees.length){
+    document.querySelector('.calendar-wrap').innerHTML = '<div class="empty-state">Ajoutez un employé pour commencer le pointage.</div>';
+    return;
+  }
+  const year = currentMonth.getFullYear();
+  const holidays = frenchHolidaysMap(year);
+  const nbDays = daysInMonth(currentMonth);
+
+  let thead = '<tr><th>Date</th>' + employees.map(e=>`<th>${escapeHtml(e.name)}</th>`).join('') + '</tr>';
+  let rows = '';
+  for(let day=1; day<=nbDays; day++){
+    const d = new Date(year, currentMonth.getMonth(), day);
+    const dow = d.getDay();
+    const ds = dateKey(d);
+    const holidayLabel = holidays[ds];
+    rows += `<tr class="${holidayLabel ? 'holiday' : ''}">`;
+    rows += `<td class="date-cell">${JOURS_FR[dow]} ${String(day).padStart(2,'0')}${holidayLabel ? '<span class=\"holiday-tag\">'+holidayLabel+'</span>' : ''}</td>`;
+    employees.forEach(emp=>{
+      const isRest = (emp.restDays||[]).includes(dow);
+      const rec = records[emp.id+'|'+ds];
+      let cellContent = '';
+      if(rec && rec.statusId){
+        const st = statusTypes.find(s=>s.id===rec.statusId);
+        if(st){
+          cellContent = `<span class="cell-chip" style="background:${st.color}">${escapeHtml(st.label)}</span>`;
+          if(rec.note) cellContent += `<span class="ot-badge">📝 ${escapeHtml(rec.note)}</span>`;
+          if(rec.retard) cellContent += `<span class="ot-badge">⏰ Retard ${rec.retard}min</span>`;
+          if(st.kind==='absence' && rec.absenceReason) cellContent += `<span class="ot-badge">Motif : ${escapeHtml(rec.absenceReason)}</span>`;
+          if(rec.commission) cellContent += `<span class="ot-badge">Commission : ${rec.commission}€</span>`;
+          if(st.paid && isRest) cellContent += `<span class="x2-badge">×2 (repos)</span>`;
+          if(rec.ot) cellContent += `<span class="ot-badge">+${rec.ot}h sup</span>`;
+        }
+      }
+      rows += `<td class="day-cell ${isRest?'rest-cell':''}" data-emp="${emp.id}" data-date="${ds}">${cellContent}</td>`;
+    });
+    rows += '</tr>';
+  }
+  table.innerHTML = thead + rows;
+  table.querySelectorAll('td.day-cell').forEach(td=>{
+    td.addEventListener('click', ()=> openDayModal(td.dataset.emp, td.dataset.date));
+  });
+}
+
+function renderSummary(){
+  const table = document.getElementById('summaryTable');
+  if(!employees.length){ table.innerHTML=''; return; }
+
+  const year = currentMonth.getFullYear();
+  const nbDays = daysInMonth(currentMonth);
+  let head = `<tr>
+    <th>Employé</th>
+    <th class="num">Heures travaillées</th>
+    <th class="num">Jours de repos</th>
+    <th class="num">Jours de permanence</th>
+    <th class="num">Jours d'absence</th>
+    <th class="num">Heures sup.</th>
+    <th class="num">Total du mois</th>
+  </tr>`;
+  let body = '';
+
+  employees.forEach(emp=>{
+    const netHoursPerDay = Math.max(0, (emp.scheduledHours||8) - (emp.breakHours||0));
+    let workedHours = 0, restDaysCount = 0, permanenceDays = 0, absenceDays = 0;
+    let basePay = 0, bonusPay = 0, otHours = 0, otPay = 0, commissionPay = 0;
+    const mode = emp.paymentMode || 'jour';
+
+    for(let day=1; day<=nbDays; day++){
+      const d = new Date(year, currentMonth.getMonth(), day);
+      const dow = d.getDay();
+      const ds = dateKey(d);
+      const isRest = (emp.restDays||[]).includes(dow);
+      if(isRest) restDaysCount++;
+
+      const rec = records[emp.id+'|'+ds];
+      if(!rec || !rec.statusId) continue;
+      const st = statusTypes.find(s=>s.id===rec.statusId);
+      if(!st) continue;
+
+      if(st.kind === 'absence') absenceDays++;
+      if(st.kind === 'permanence') permanenceDays++;
+
+      if(mode === 'jour'){
+        if(st.paid) basePay += emp.dailyRate * (isRest ? 2 : 1);
+      } else if(mode === 'heure'){
+        if(st.paid) basePay += netHoursPerDay * (emp.hourlyRate||0) * (isRest ? 2 : 1);
+      } else if(mode === 'commission'){
+        if(rec.commission) commissionPay += Number(rec.commission) * (isRest ? 2 : 1);
+      }
+
+      if(st.bonus){ bonusPay += st.bonus; }
+      if(st.worked){ workedHours += netHoursPerDay; }
+      if(rec.ot){ otHours += Number(rec.ot); otPay += Number(rec.ot) * emp.otRate; }
+    }
+    const total = basePay + bonusPay + otPay + commissionPay;
+
+    body += `<tr>
+      <td><strong>${escapeHtml(emp.name)}</strong></td>
+      <td class="num">${workedHours}h</td>
+      <td class="num">${restDaysCount}</td>
+      <td class="num">${permanenceDays}</td>
+      <td class="num">${absenceDays}</td>
+      <td class="num">${otHours}h (${otPay.toFixed(2)}€)</td>
+      <td class="num total">${total.toFixed(2)}€</td>
+    </tr>`;
+  });
+
+  table.innerHTML = head + body;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ============================================================
+   MODALE JOUR
+   ============================================================ */
+function updateModalConditionalFields(){
+  const picker = document.getElementById('statusPicker');
+  const selected = picker.querySelector('.status-option.selected');
+  const st = selected ? statusTypes.find(s=>s.id===selected.dataset.status) : null;
+  document.getElementById('absenceField').style.display = (st && st.kind==='absence') ? 'block' : 'none';
+
+  const emp = employees.find(e=>e.id===editingCell.empId);
+  document.getElementById('commissionField').style.display = (emp && emp.paymentMode==='commission' && st && st.kind!=='absence') ? 'block' : 'none';
+}
+
+function openDayModal(empId, ds){
+  editingCell = {empId, ds};
+  const emp = employees.find(e=>e.id===empId);
+  const rec = records[empId+'|'+ds] || {};
+  const d = new Date(ds+'T00:00:00');
+  const dow = d.getDay();
+  const isRest = emp && (emp.restDays||[]).includes(dow);
+  const year = d.getFullYear();
+  const holidayLabel = frenchHolidaysMap(year)[ds];
+
+  document.getElementById('modalEmpName').textContent = emp ? emp.name : '—';
+  document.getElementById('modalDate').textContent = ds + ' · ' + JOURS_FR[dow];
+  const flag = document.getElementById('modalFlag');
+  let flagMsgs = [];
+  if(isRest) flagMsgs.push("Jour de repos habituel — un statut payé ici sera compté ×2");
+  if(holidayLabel) flagMsgs.push("Jour férié : " + holidayLabel);
+  if(flagMsgs.length){ flag.style.display='block'; flag.textContent = flagMsgs.join(' · '); }
+  else { flag.style.display='none'; }
+
+  document.getElementById('modalOt').value = rec.ot || '';
+  document.getElementById('modalNote').value = rec.note || '';
+  document.getElementById('modalRetardCheck').checked = !!rec.retard;
+  document.getElementById('modalRetardMin').value = rec.retard || '';
+  document.getElementById('modalRetardMin').style.display = rec.retard ? 'block' : 'none';
+  document.getElementById('modalAbsenceReason').value = rec.absenceReason || '';
+  document.getElementById('modalCommission').value = rec.commission != null ? rec.commission : '0';
+
+  const picker = document.getElementById('statusPicker');
+  picker.innerHTML = statusTypes.map(s=>`
+    <div class="status-option ${rec.statusId===s.id?'selected':''}" data-status="${s.id}">
+      <span class="dot" style="background:${s.color}"></span>${escapeHtml(s.label)}
+    </div>
+  `).join('');
+  picker.querySelectorAll('.status-option').forEach(opt=>{
+    opt.addEventListener('click', ()=>{
+      picker.querySelectorAll('.status-option').forEach(o=>o.classList.remove('selected'));
+      opt.classList.add('selected');
+      updateModalConditionalFields();
+    });
+  });
+
+  updateModalConditionalFields();
+  document.getElementById('dayModal').classList.add('open');
+}
+
+document.getElementById('modalRetardCheck').addEventListener('change', (e)=>{
+  document.getElementById('modalRetardMin').style.display = e.target.checked ? 'block' : 'none';
+});
+
+document.getElementById('saveDay').addEventListener('click', async ()=>{
+  if(!editingCell) return;
+  const picker = document.getElementById('statusPicker');
+  const selected = picker.querySelector('.status-option.selected');
+  const key = editingCell.empId + '|' + editingCell.ds;
+  if(!selected){
+    delete records[key];
+  } else {
+    const st = statusTypes.find(s=>s.id===selected.dataset.status);
+    const emp = employees.find(e=>e.id===editingCell.empId);
+    records[key] = {
+      statusId: selected.dataset.status,
+      ot: parseFloat(document.getElementById('modalOt').value) || 0,
+      note: document.getElementById('modalNote').value.trim(),
+      retard: document.getElementById('modalRetardCheck').checked ? (parseInt(document.getElementById('modalRetardMin').value) || 0) : 0,
+      absenceReason: (st && st.kind==='absence') ? document.getElementById('modalAbsenceReason').value.trim() : '',
+      commission: (emp && emp.paymentMode==='commission') ? parseFloat(document.getElementById('modalCommission').value) || 0 : 0
+    };
+  }
+  await saveRecords();
+  document.getElementById('dayModal').classList.remove('open');
+  renderCalendar();
+  renderSummary();
+});
+document.getElementById('clearDay').addEventListener('click', async ()=>{
+  if(!editingCell) return;
+  delete records[editingCell.empId + '|' + editingCell.ds];
+  await saveRecords();
+  document.getElementById('dayModal').classList.remove('open');
+  renderCalendar();
+  renderSummary();
+});
+document.getElementById('dayModal').addEventListener('click', (e)=>{
+  if(e.target.id === 'dayModal') document.getElementById('dayModal').classList.remove('open');
+});
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') document.getElementById('dayModal').classList.remove('open'); });
+
+/* ============================================================
+   NAVIGATION MOIS
+   ============================================================ */
+document.getElementById('prevMonth').addEventListener('click', async ()=>{
+  currentMonth.setMonth(currentMonth.getMonth()-1);
+  records = await loadRecords();
+  renderAll();
+});
+document.getElementById('nextMonth').addEventListener('click', async ()=>{
+  currentMonth.setMonth(currentMonth.getMonth()+1);
+  records = await loadRecords();
+  renderAll();
+});
+
+/* ============================================================
+   FORMULAIRES
+   ============================================================ */
+document.getElementById('toggleEmpForm').addEventListener('click', ()=>{
+  const f = document.getElementById('empForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+});
+document.getElementById('empPaymentMode').addEventListener('change', (e)=>{
+  document.getElementById('empHourlyRateField').style.display = e.target.value === 'heure' ? 'block' : 'none';
+});
+document.getElementById('saveEmp').addEventListener('click', async ()=>{
+  const name = document.getElementById('empName').value.trim();
+  const rate = parseFloat(document.getElementById('empRate').value) || 0;
+  const ot = parseFloat(document.getElementById('empOt').value) || 0;
+  const startTime = document.getElementById('empStart').value || '08:00';
+  const scheduledHours = parseFloat(document.getElementById('empHours').value) || 8;
+  const breakHours = parseFloat(document.getElementById('empBreak').value) || 0;
+  const restDays = Array.from(document.querySelectorAll('#empRestDays input:checked')).map(c=>parseInt(c.value));
+  const role = document.getElementById('empRole').value.trim();
+  const paymentMode = document.getElementById('empPaymentMode').value;
+  const hourlyRate = parseFloat(document.getElementById('empHourlyRate').value) || 0;
+  const trial = document.getElementById('empTrial').checked;
+  if(!name){ showToast('Merci de saisir un nom'); return; }
+  employees.push({ id: uid('emp_'), name, dailyRate:rate, otRate:ot, startTime, scheduledHours, breakHours, restDays, role, paymentMode, hourlyRate, trial });
+  await saveMeta();
+  document.getElementById('empName').value='';
+  document.getElementById('empRate').value='';
+  document.getElementById('empOt').value='';
+  document.getElementById('empRole').value='';
+  document.getElementById('empHourlyRate').value='';
+  document.getElementById('empTrial').checked=false;
+  document.getElementById('empForm').style.display='none';
+  renderAll();
+  showToast('Employé ajouté');
+});
+
+document.getElementById('toggleStatusForm').addEventListener('click', ()=>{
+  const f = document.getElementById('statusForm');
+  f.style.display = f.style.display === 'none' ? 'flex' : 'none';
+});
+document.getElementById('saveStatus').addEventListener('click', async ()=>{
+  const label = document.getElementById('statusLabel').value.trim();
+  const color = document.getElementById('statusColor').value;
+  const kind = document.getElementById('statusKind').value;
+  const paid = document.getElementById('statusPaid').checked;
+  const worked = document.getElementById('statusWorked').checked;
+  const bonus = parseFloat(document.getElementById('statusBonus').value) || 0;
+  if(!label){ showToast('Merci de saisir un libellé'); return; }
+  statusTypes.push({ id: uid('st_'), label, color, kind, paid, worked, bonus });
+  await saveMeta();
+  document.getElementById('statusLabel').value='';
+  document.getElementById('statusBonus').value='';
+  document.getElementById('statusForm').style.display='none';
+  renderAll();
+  showToast('Statut ajouté');
+});
+
+/* ============================================================
+   EXPORT EXCEL (fin de mois)
+   ============================================================ */
+function buildCalendarSheetData(){
+  const year = currentMonth.getFullYear();
+  const nbDays = daysInMonth(currentMonth);
+  const holidays = frenchHolidaysMap(year);
+
+  const header = ['Date', 'Jour', 'Férié', ...employees.map(e=>e.name)];
+  const rows = [header];
+
+  for(let day=1; day<=nbDays; day++){
+    const d = new Date(year, currentMonth.getMonth(), day);
+    const dow = d.getDay();
+    const ds = dateKey(d);
+    const row = [ds, JOURS_FR[dow], holidays[ds] || ''];
+    employees.forEach(emp=>{
+      const rec = records[emp.id+'|'+ds];
+      if(rec && rec.statusId){
+        const st = statusTypes.find(s=>s.id===rec.statusId);
+        let cell = st ? st.label : '';
+        const isRest = (emp.restDays||[]).includes(dow);
+        if(st && st.paid && isRest) cell += ' (x2)';
+        if(rec.ot) cell += ' +' + rec.ot + 'h sup';
+        row.push(cell);
+      } else {
+        row.push((emp.restDays||[]).includes(dow) ? 'Repos' : '');
+      }
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function buildSummarySheetData(){
+  const year = currentMonth.getFullYear();
+  const nbDays = daysInMonth(currentMonth);
+  const header = ['Employé','Heures travaillées','Jours de repos','Jours de permanence','Jours d\'absence','Heures sup','Paiement heures sup (€)','Commissions (€)','Total du mois (€)'];
+  const rows = [header];
+
+  employees.forEach(emp=>{
+    const netHoursPerDay = Math.max(0, (emp.scheduledHours||8) - (emp.breakHours||0));
+    let workedHours = 0, restDaysCount = 0, permanenceDays = 0, absenceDays = 0;
+    let basePay = 0, bonusPay = 0, otHours = 0, otPay = 0, commissionPay = 0;
+    const mode = emp.paymentMode || 'jour';
+
+    for(let day=1; day<=nbDays; day++){
+      const d = new Date(year, currentMonth.getMonth(), day);
+      const dow = d.getDay();
+      const ds = dateKey(d);
+      const isRest = (emp.restDays||[]).includes(dow);
+      if(isRest) restDaysCount++;
+      const rec = records[emp.id+'|'+ds];
+      if(!rec || !rec.statusId) continue;
+      const st = statusTypes.find(s=>s.id===rec.statusId);
+      if(!st) continue;
+      if(st.kind === 'absence') absenceDays++;
+      if(st.kind === 'permanence') permanenceDays++;
+      if(mode === 'jour'){
+        if(st.paid) basePay += emp.dailyRate * (isRest ? 2 : 1);
+      } else if(mode === 'heure'){
+        if(st.paid) basePay += netHoursPerDay * (emp.hourlyRate||0) * (isRest ? 2 : 1);
+      } else if(mode === 'commission'){
+        if(rec.commission) commissionPay += Number(rec.commission) * (isRest ? 2 : 1);
+      }
+      if(st.bonus) bonusPay += st.bonus;
+      if(st.worked) workedHours += netHoursPerDay;
+      if(rec.ot){ otHours += Number(rec.ot); otPay += Number(rec.ot) * emp.otRate; }
+    }
+    const total = basePay + bonusPay + otPay + commissionPay;
+    rows.push([emp.name, workedHours, restDaysCount, permanenceDays, absenceDays, otHours, Number(otPay.toFixed(2)), Number(commissionPay.toFixed(2)), Number(total.toFixed(2))]);
+  });
+  return rows;
+}
+
+document.getElementById('exportExcel').addEventListener('click', ()=>{
+  if(!employees.length){ showToast('Ajoutez au moins un employé avant d\'exporter'); return; }
+  try{
+    const wb = XLSX.utils.book_new();
+    const wsCalendar = XLSX.utils.aoa_to_sheet(buildCalendarSheetData());
+    const wsSummary = XLSX.utils.aoa_to_sheet(buildSummarySheetData());
+    XLSX.utils.book_append_sheet(wb, wsCalendar, 'Calendrier');
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Résumé');
+    const fileName = 'pointage-' + monthKey(currentMonth) + '.xlsx';
+    XLSX.writeFile(wb, fileName);
+    showToast('Fichier exporté : ' + fileName);
+  }catch(e){
+    console.error(e);
+    showToast("Erreur lors de l'export");
+  }
+});
+
+/* ============================================================
+   LANCEMENT
+   ============================================================ */
+init().catch(err=>{ console.error(err); showToast("Erreur au chargement des données"); });
+</script>
+
+</body>
+</html>
